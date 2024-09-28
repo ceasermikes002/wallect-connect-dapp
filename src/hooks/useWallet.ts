@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Provider, ethers } from 'ethers';
 import axios from 'axios';
 
-// Example API endpoint for Chainlist (get network details dynamically)
+// API endpoint for Chainlist for getting network details dynamically
 const CHAINLIST_API = 'https://chainid.network/chains.json';
 
 declare global {
@@ -34,6 +34,12 @@ export const useWallet = () => {
   }, []);
 
   const getNetworkName = (chainId: number): string => {
+    // Ensure that networkData is available before trying to find a match
+    if (networkData.length === 0) {
+      return `Unknown Network (ID: ${chainId})`;
+    }
+
+    // Chainlist API returns chainId in decimal, so ensure we are comparing as a number
     const networkInfo = networkData.find((net) => net.chainId === chainId);
     return networkInfo ? networkInfo.name : `Unknown Network (ID: ${chainId})`;
   };
@@ -60,7 +66,7 @@ export const useWallet = () => {
 
       // Fetch network details
       const { chainId }: any = await provider.getNetwork();
-      setNetwork(getNetworkName(chainId));
+      setNetwork(getNetworkName(Number(chainId))); // Ensure chainId is treated as a number
     } catch (err) {
       console.error('Error Connecting to wallet', err);
     }
@@ -86,7 +92,7 @@ export const useWallet = () => {
     if (provider) {
       provider.on('network', (newNetwork) => {
         const chainId = newNetwork.chainId;
-        setNetwork(getNetworkName(chainId));
+        setNetwork(getNetworkName(Number(chainId))); // Convert chainId to number
       });
 
       provider.on('accountsChanged', (changedAccounts) => {
