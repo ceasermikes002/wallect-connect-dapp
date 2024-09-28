@@ -1,61 +1,104 @@
-import {useState, useEffect, useCallback} from 'react'
-import {Provider, ethers} from 'ethers'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useCallback } from 'react';
+import { Provider, ethers } from 'ethers';
+import axios from 'axios';
+
+// Example API endpoint for Chainlist (get network details dynamically)
+const CHAINLIST_API = 'https://chainid.network/chains.json';
 
 declare global {
-    interface Window {
-      ethereum: never; 
-    }
+  interface Window {
+    ethereum?: any;
   }
-  
-export const useWallet = () => {
-  
-
-    // Account State
-    const [account, setAccount] = useState<string | null>(null)
-    // Balance State
-    const [balance, setBalance] = useState<string | null>(null)
-    // Provider State ie MetaMask
-    const [provider, setProvider] = useState<Provider| null>(null)
-    //Network State
-    const [network, setNetwork] = useState<string | null>(null)
-
-    // Connect Wallet Method
-    const connectWallet = useCallback(async () => {
-        if(!window.ethereum) {
-            alert('Please Install MetaMask')
-            return
-        }
-        try{
-            const provider = new ethers.BrowserProvider(window.ethereum)
-            const accounts = await provider.send("eth_requestAccounts", [])
-            setAccount(accounts[0])
-            setProvider(provider)
-        }catch(err) {
-            console.error('Error Conecting to wallet', err)
-        }
-    }, [])
-
-    // Wallet Balance Function
-    const getBalance = useCallback(async (address:string) => {
-        if (provider && ethers.isAddress(address)) {
-            try{
-                const balance = await provider.getBalance(address)
-                setBalance(ethers.formatEther(balance))
-            }catch(err) {
-                console.error("Failed to fetch Balance", err)
-            }
-        }else{
-            alert("Please enter a valid wallet address and try again.")
-        }
-    }, [provider])
-
-    // Network and account change events
-    useEffect(() => {
-        if(provider) {
-            provider.on("network", (newNetwork) => setNetwork(newNetwork.name))
-            provider.on("accountsChanges", (changedAccount) => setAccount(changedAccount[0] || null))
-        }
-    },[provider])
-
-    return {getBalance, connectWallet, account, balance, network}
 }
+
+export const useWallet = () => {
+  const [account, setAccount] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [network, setNetwork] = useState<string | null>(null);
+  const [networkData, setNetworkData] = useState<any[]>([]);
+  const [providerName, setProviderName] = useState<string>('Unknown');
+
+  // Fetch network data from Chainlist
+  useEffect(() => {
+    const fetchNetworkData = async () => {
+      try {
+        const { data } = await axios.get(CHAINLIST_API);
+        setNetworkData(data);
+      } catch (err) {
+        console.error('Failed to fetch network data', err);
+      }
+    };
+    fetchNetworkData();
+  }, []);
+
+  const getNetworkName = (chainId: number): string => {
+    const networkInfo = networkData.find((net) => net.chainId === chainId);
+    return networkInfo ? networkInfo.name : `Unknown Network (ID: ${chainId})`;
+  };
+
+  const connectWallet = useCallback(async () => {
+    if (!window.ethereum) {
+      alert('Please Install MetaMask');
+      return;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send('eth_requestAccounts', []);
+      setAccount(accounts[0]);
+      setProvider(provider);
+
+      // Detect and set the provider name
+      if (window.ethereum.isMetaMask) {
+        setProviderName('MetaMask');
+      } else if (window.ethereum.isCoinbaseWallet) {
+        setProviderName('Coinbase Wallet');
+      } else {
+        setProviderName('Other Wallet');
+      }
+
+      // Fetch network details
+      const { chainId }: any = await provider.getNetwork();
+      setNetwork(getNetworkName(chainId));
+    } catch (err) {
+      console.error('Error Connecting to wallet', err);
+    }
+  }, [networkData]);
+
+  const getBalance = useCallback(
+    async (address: string) => {
+      if (provider && ethers.isAddress(address)) {
+        try {
+          const balance = await provider.getBalance(address);
+          setBalance(ethers.formatEther(balance));
+        } catch (err) {
+          console.error('Failed to fetch Balance', err);
+        }
+      } else {
+        alert('Please enter a valid wallet address and try again.');
+      }
+    },
+    [provider]
+  );
+
+  useEffect(() => {
+    if (provider) {
+      provider.on('network', (newNetwork) => {
+        const chainId = newNetwork.chainId;
+        setNetwork(getNetworkName(chainId));
+      });
+
+      provider.on('accountsChanged', (changedAccounts) => {
+        setAccount(changedAccounts[0] || null);
+      });
+
+      return () => {
+        provider.off('network');
+        provider.off('accountsChanged');
+      };
+    }
+  }, [provider, networkData]);
+
+  return { getBalance, connectWallet, account, balance, network, providerName };
+};

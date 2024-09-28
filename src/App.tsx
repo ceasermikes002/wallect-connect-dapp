@@ -1,12 +1,18 @@
 // src/App.tsx
 import { useState } from "react";
 import { useWallet } from "./hooks/useWallet";
-import { Flex, Text, Button, Card } from "@radix-ui/themes"; 
-
+import { Flex, Text, Button, Card } from "@radix-ui/themes";
 import '@radix-ui/themes/styles.css';
 
+// Provider icons mapping
+const ProviderIcons: { [key: string]: string } = {
+  MetaMask: "🦊",   // MetaMask icon
+  "Coinbase Wallet": "💼",  // Coinbase Wallet icon
+  "Other Wallet": "🔗",   // Default icon for other wallets
+};
+
 const App = () => {
-  const { account, balance, network, connectWallet, getBalance } = useWallet();
+  const { account, balance, network, providerName, connectWallet, getBalance } = useWallet();
   const [address, setAddress] = useState("");
 
   return (
@@ -29,11 +35,15 @@ const App = () => {
 
           {account && (
             <Flex direction="column" gap="1">
+              {/* Display provider icon dynamically */}
+              <Text className="mb-2">
+                <strong>Provider:</strong> {ProviderIcons[providerName] || ProviderIcons["Other Wallet"]} {providerName}
+              </Text>
               <Text className="mb-2">
                 <strong>Account:</strong> {account}
               </Text>
               <Text className="mb-2">
-                <strong>Network:</strong> {network || "Unknown"}
+                <strong>Network:</strong> {network}
               </Text>
             </Flex>
           )}
