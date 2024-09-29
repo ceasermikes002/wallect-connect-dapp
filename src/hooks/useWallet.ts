@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Provider, ethers } from 'ethers';
 import axios from 'axios';
 
-// API endpoint for Chainlist for getting network details dynamically
+// API endpoint for Chainlist to get network details dynamically
 const CHAINLIST_API = 'https://chainid.network/chains.json';
 
 declare global {
@@ -68,7 +68,7 @@ export const useWallet = () => {
       const { chainId }: any = await provider.getNetwork();
       setNetwork(getNetworkName(Number(chainId))); // Ensure chainId is treated as a number
     } catch (err) {
-      console.error('Error Connecting to wallet', err);
+      console.error('Error connecting to wallet', err);
     }
   }, [networkData]);
 
@@ -79,7 +79,7 @@ export const useWallet = () => {
           const balance = await provider.getBalance(address);
           setBalance(ethers.formatEther(balance));
         } catch (err) {
-          console.error('Failed to fetch Balance', err);
+          console.error('Failed to fetch balance', err);
         }
       } else {
         alert('Please enter a valid wallet address and try again.');
@@ -88,23 +88,30 @@ export const useWallet = () => {
     [provider]
   );
 
+  // Add event listeners
   useEffect(() => {
     if (provider) {
-      provider.on('network', (newNetwork) => {
+      // Define event handlers
+      const handleNetworkChange = (newNetwork: any) => {
         const chainId = newNetwork.chainId;
         setNetwork(getNetworkName(Number(chainId))); // Convert chainId to number
-      });
+      };
 
-      provider.on('accountsChanged', (changedAccounts) => {
+      const handleAccountsChanged = (changedAccounts: string[]) => {
         setAccount(changedAccounts[0] || null);
-      });
+      };
 
+      // Add event listeners
+      provider.on('network', handleNetworkChange);
+      provider.on('accountsChanged', handleAccountsChanged);
+
+      // Cleanup event listeners
       return () => {
-        provider.off('network');
-        provider.off('accountsChanged');
+        provider.off('network', handleNetworkChange);
+        provider.off('accountsChanged', handleAccountsChanged);
       };
     }
-  }, [provider, networkData]);
+  }, [provider, networkData]); // Ensure dependencies include networkData
 
   return { getBalance, connectWallet, account, balance, network, providerName };
 };
