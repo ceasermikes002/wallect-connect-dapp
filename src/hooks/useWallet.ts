@@ -34,7 +34,6 @@ export const useWallet = () => {
   }, []);
 
   const getNetworkName = (chainId: number): string => {
-    // Ensure that networkData is available before trying to find a match
     if (networkData.length === 0) {
       return `Unknown Network (ID: ${chainId})`;
     }
@@ -45,7 +44,7 @@ export const useWallet = () => {
   };
 
   const connectWallet = useCallback(async () => {
-    if (!window.ethereum) {
+    if (window.ethereum) {
       alert('Please Install MetaMask');
       return;
     }
@@ -66,7 +65,7 @@ export const useWallet = () => {
 
       // Fetch network details
       const { chainId }: any = await provider.getNetwork();
-      setNetwork(getNetworkName(Number(chainId))); // Ensure chainId is treated as a number
+      setNetwork(getNetworkName(Number(chainId))); 
     } catch (err) {
       console.error('Error Connecting to wallet', err);
     }
@@ -90,21 +89,27 @@ export const useWallet = () => {
 
   useEffect(() => {
     if (provider) {
-      provider.on('network', (newNetwork) => {
+      const handleNetworkChange = (newNetwork: any) => {
         const chainId = newNetwork.chainId;
         setNetwork(getNetworkName(Number(chainId))); // Convert chainId to number
-      });
-
-      provider.on('accountsChanged', (changedAccounts) => {
+      };
+  
+      const handleAccountsChanged = (changedAccounts: string[]) => {
         setAccount(changedAccounts[0] || null);
-      });
-
+      };
+  
+      // Add event listeners
+      provider.on('network', handleNetworkChange);
+      provider.on('accountsChanged', handleAccountsChanged);
+  
+      // Cleanup event
       return () => {
-        provider.off('network');
-        provider.off('accountsChanged');
+        provider.off('network', handleNetworkChange);
+        provider.off('accountsChanged', handleAccountsChanged);
       };
     }
   }, [provider, networkData]);
+  
 
   return { getBalance, connectWallet, account, balance, network, providerName };
 };

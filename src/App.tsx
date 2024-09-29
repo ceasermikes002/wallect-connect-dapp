@@ -6,7 +6,7 @@ import '@radix-ui/themes/styles.css';
 
 // Provider icons mapping
 const ProviderIcons: { [key: string]: string } = {
-  MetaMask: "🦊",   // MetaMask icon
+  'MetaMask': "🦊",   // MetaMask icon
   "Coinbase Wallet": "💼",  // Coinbase Wallet icon
   "Other Wallet": "🔗",   // Default icon for other wallets
 };
