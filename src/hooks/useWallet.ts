@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
-import { Provider, ethers } from 'ethers';
+import { useCallback, useEffect, useState } from 'react';
+import { ethers } from 'ethers';
 import axios from 'axios';
+import { useWalletContext } from '../WalletContext';
+import { Network } from 'ethers';
 
 // API endpoint for Chainlist to get network details dynamically
 const CHAINLIST_API = 'https://chainid.network/chains.json';
@@ -13,12 +15,8 @@ declare global {
 }
 
 export const useWallet = () => {
-  const [account, setAccount] = useState<string | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
-  const [provider, setProvider] = useState<Provider | null>(null);
-  const [network, setNetwork] = useState<string | null>(null);
+  const { account, setAccount, balance, setBalance, provider, setProvider, network, setNetwork, providerName, setProviderName } = useWalletContext();
   const [networkData, setNetworkData] = useState<any[]>([]);
-  const [providerName, setProviderName] = useState<string>('Unknown');
 
   // Fetch network data from Chainlist
   useEffect(() => {
@@ -34,19 +32,16 @@ export const useWallet = () => {
   }, []);
 
   const getNetworkName = (chainId: number): string => {
-    // Ensure that networkData is available before trying to find a match
     if (networkData.length === 0) {
       return `Unknown Network (ID: ${chainId})`;
     }
-
-    // Chainlist API returns chainId in decimal, so ensure we are comparing as a number
     const networkInfo = networkData.find((net) => net.chainId === chainId);
     return networkInfo ? networkInfo.name : `Unknown Network (ID: ${chainId})`;
   };
 
   const connectWallet = useCallback(async () => {
     if (!window.ethereum) {
-      alert('Please Install MetaMask');
+      alert('Please Install a wallet provider');
       return;
     }
     try {
@@ -55,7 +50,6 @@ export const useWallet = () => {
       setAccount(accounts[0]);
       setProvider(provider);
 
-      // Detect and set the provider name
       if (window.ethereum.isMetaMask) {
         setProviderName('MetaMask');
       } else if (window.ethereum.isCoinbaseWallet) {
@@ -64,13 +58,12 @@ export const useWallet = () => {
         setProviderName('Other Wallet');
       }
 
-      // Fetch network details
-      const { chainId }: any = await provider.getNetwork();
-      setNetwork(getNetworkName(Number(chainId))); // Ensure chainId is treated as a number
+      const { chainId }: Network = await provider.getNetwork();
+      setNetwork(getNetworkName(Number(chainId)));
     } catch (err) {
       console.error('Error connecting to wallet', err);
     }
-  }, [networkData]);
+  }, [networkData, setAccount, setProvider, setNetwork, setProviderName]);
 
   const getBalance = useCallback(
     async (address: string) => {
@@ -85,33 +78,30 @@ export const useWallet = () => {
         alert('Please enter a valid wallet address and try again.');
       }
     },
-    [provider]
+    [provider, setBalance]
   );
 
-  // Add event listeners
   useEffect(() => {
     if (provider) {
-      // Define event handlers
-      const handleNetworkChange = (newNetwork: any) => {
-        const chainId = newNetwork.chainId;
-        setNetwork(getNetworkName(Number(chainId))); // Convert chainId to number
+      const handleChainChanged = (chainId: string) => {
+        setNetwork(getNetworkName(Number(chainId)));
       };
 
-      const handleAccountsChanged = (changedAccounts: string[]) => {
-        setAccount(changedAccounts[0] || null);
+      const handleAccountsChanged = (accounts: string[]) => {
+        setAccount(accounts.length > 0 ? accounts[0] : null);
       };
 
-      // Add event listeners
-      provider.on('network', handleNetworkChange);
-      provider.on('accountsChanged', handleAccountsChanged);
+      const walletProvider = window.ethereum
+      
+      walletProvider.on('chainChanged', handleChainChanged);
+      walletProvider.on('accountsChanged', handleAccountsChanged);
 
-      // Cleanup event listeners
       return () => {
-        provider.off('network', handleNetworkChange);
-        provider.off('accountsChanged', handleAccountsChanged);
+        walletProvider.removeListener('chainChanged', handleChainChanged);
+        walletProvider.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
-  }, [provider, networkData]); // Ensure dependencies include networkData
+  }, [provider, networkData, setNetwork, setAccount]);
 
-  return { getBalance, connectWallet, account, balance, network, providerName };
+  return { connectWallet, getBalance, account, balance, network, providerName };
 };
